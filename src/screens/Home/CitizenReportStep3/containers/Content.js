@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, Text, Platform, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Button, IconButton } from 'react-native-paper';
+import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import moment from 'moment';
-import i18n from 'i18n-js';
-import { LocalGRMDatabase } from '../../../../utils/databaseManager';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform, ScrollView, Text, View } from 'react-native';
+import { Button, Dialog, Paragraph, Portal } from 'react-native-paper';
 import { colors } from '../../../../utils/colors';
+import { LocalGRMDatabase } from '../../../../utils/databaseManager';
 import { styles } from './Content.styles';
-import { Audio } from 'expo-av';
 
 const SAMPLE_WORDS = ['car', 'house', 'tree', 'ball'];
 const theme = {
@@ -22,7 +22,12 @@ const theme = {
 };
 
 function Content({ issue, eadl }) {
+  const { t } = useTranslation();
   const navigation = useNavigation();
+  const [showDialog, setShowDialog] = useState(false);
+
+  const _hideDialog = () => setShowDialog(false);
+  const _showDialog = () => setShowDialog(true);
   // const incrementId = () => {
   //   const last = eadl.bp_projects[eadl.bp_projects.length - 1];
   //   if (!eadl.bp_projects[0]) return 1;
@@ -49,13 +54,13 @@ function Content({ issue, eadl }) {
         ...(issue?.recording ? [issue.recording] : []),
       ],
       status: {
-        name: i18n.t('open'),
-        id: 1,
+        name: t('open'),
+        id: 2,
       },
       confirmed: true,
-      assignee: isAssignee ? { id: eadl._id, name: eadl.representative?.name } : '',
+      assignee: isAssignee ? { id: eadl?._id, name: eadl.representative?.name } : '',
       reporter: {
-        id: eadl._id,
+        id: eadl?._id,
         name: eadl.representative.name,
       },
       citizen_age_group: issue.ageGroup,
@@ -76,6 +81,9 @@ function Content({ issue, eadl }) {
       // },
       category: issue.category,
       issue_type: issue.issueType,
+      issue_sub_type: issue.issueSubType,
+      component: issue.issueComponent,
+      sub_component: issue.issueSubComponent,
       //   type: {
       //   id: 1,
       //   name: "Complaint",
@@ -113,8 +121,8 @@ function Content({ issue, eadl }) {
   };
 
   const playSound = async (recordingUri) => {
-    if(playing === false) {
-      setPlaying(true)
+    if (playing === false) {
+      setPlaying(true);
       // console.log("Loading Sound");
       const { sound } = await Audio.Sound.createAsync({ uri: recordingUri });
       setSound(sound);
@@ -122,10 +130,10 @@ function Content({ issue, eadl }) {
       await sound.playAsync();
 
       sound.setOnPlaybackStatusUpdate((status) => {
-        if(status.didJustFinish) {
-          setPlaying(false)
+        if (status.didJustFinish) {
+          setPlaying(false);
         }
-      })
+      });
     }
     // setPlaying(false)
   };
@@ -134,15 +142,12 @@ function Content({ issue, eadl }) {
     () =>
       sound
         ? () => {
-          // console.log("Unloading Sound");
-          sound.unloadAsync();
-
-        }
+            // console.log("Unloading Sound");
+            sound.unloadAsync();
+          }
         : undefined,
     [sound]
   );
-
-
 
   useEffect(() => {
     (async () => {
@@ -157,79 +162,69 @@ function Content({ issue, eadl }) {
   return (
     <ScrollView>
       <View style={{ padding: 23 }}>
-        <Text style={styles.stepText}>{i18n.t('step_5')}</Text>
-        <Text style={styles.stepSubtitle}>{i18n.t('step_3_confirmation')}</Text>
-        <Text style={styles.stepDescription}>{i18n.t('step_3_subtitle')}</Text>
+        <Text style={styles.stepText}>{t('step_5')}</Text>
+        <Text style={styles.stepSubtitle}>{t('step_3_confirmation')}</Text>
+        <Text style={styles.stepDescription}>{t('step_3_subtitle')}</Text>
       </View>
 
-      <View
-        style={{
-          margin: 23,
-          padding: 18,
-          borderRadius: 10,
-          shadowColor: 'rgba(0, 0, 0, 0.05)',
-          shadowOffset: {
-            width: 0,
-            height: 3,
-          },
-          shadowRadius: 15,
-          shadowOpacity: 1,
+      {/* STEP 3 SUMMARY */}
+      <View style={styles.cardConfirm}>
+        {/*
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={styles.stepLittleText}>{t('step_3')}</Text>
+          <IconButton icon={'pencil'} size={26} color={colors.primary}/>
+        </View>
+        */}
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_1')}</Text>
+          <Text style={styles.stepDescription}>
+            {issue.date !== 'null' && !!issue.date
+              ? moment(issue.date).format('DD-MMMM-YYYY')
+              : '--'}
+          </Text>
+        </View>
 
-          elevation: 7,
-          backgroundColor: 'white',
-        }}
-      >
-        <Text style={styles.stepSubtitle}>{i18n.t('step_3_field_title_1')}</Text>
-        <Text style={styles.stepDescription}>
-          {issue.date !== 'null' && !!issue.date ? moment(issue.date).format('DD-MMMM-YYYY') : '--'}
-        </Text>
-        <Text style={styles.stepSubtitle}>{i18n.t('step_3_field_title_2')}</Text>
-        <Text style={styles.stepDescription}>{issue.issueType?.name ?? '--'}</Text>
-        <Text style={styles.stepSubtitle}>{i18n.t('step_3_field_title_3')}</Text>
-        <Text style={styles.stepDescription}>{issue.category?.name ?? '--'}</Text>
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_2')}</Text>
+          <Text style={styles.stepDescription}>{issue.issueType.name ?? '--'}</Text>
+        </View>
 
-        <Text style={styles.stepSubtitle}>{i18n.t('step_3_field_title_4')}</Text>
-        <Text style={styles.stepDescription}>{issue.additionalDetails ?? '--'}</Text>
-        <Text style={styles.stepSubtitle}>{i18n.t('step_3_attachments')}</Text>
-        {issue.recording && (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              // justifyContent: 'center',
-            }}
-          >
-            <IconButton icon="play" color={playing ? colors.disabled : colors.primary} size={24} onPress={() => playSound(issue.recording.local_url)} />
-            <Text
-              style={{
-                fontFamily: 'Poppins_400Regular',
-                fontSize: 12,
-                fontWeight: 'normal',
-                fontStyle: 'normal',
-                lineHeight: 18,
-                letterSpacing: 0,
-                textAlign: 'left',
-                color: '#707070',
-                marginVertical: 13,
-              }}
-            >
-              {i18n.t('play_recorded_audio')}
-            </Text>
-          </View>
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_2_1')}</Text>
+          <Text style={styles.stepDescription}>{issue.issueSubType?.name ?? '--'}</Text>
+        </View>
+
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_3')}</Text>
+          <Text style={styles.stepDescription}>{issue.category?.name ?? '--'}</Text>
+        </View>
+
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_5')}</Text>
+          <Text style={styles.stepDescription}>{issue.issueComponent?.name ?? '--'}</Text>
+        </View>
+
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_6')}</Text>
+          <Text style={styles.stepDescription}>{issue.issueSubComponent?.name ?? '--'}</Text>
+        </View>
+
+        <View>
+          <Text style={styles.stepSubtitle}>{t('step_3_field_title_4')}</Text>
+          <Text style={styles.stepDescription}>{issue.additionalDetails ?? '--'}</Text>
+        </View>
+
+        <Text style={styles.stepSubtitle}>{t('step_3_attachments')}</Text>
+        {issue.attachment && (
+          <Text style={styles.stepDescription}>
+            Image: {JSON.stringify(issue?.attachment?.id) ?? '--'}
+          </Text>
         )}
-        {issue.attachments && issue.attachments.length > 0 && issue.attachments.map((attachment) => (
-
-          <Image
-            source={{ uri: attachment.local_url }}
-            style={{
-              height: 80,
-              width: 80,
-              justifyContent: 'flex-end',
-              marginVertical: 20,
-              marginLeft: 20
-            }}
-          />
-        ))}
+        {issue.recording && (
+          <Text style={styles.stepDescription}>
+            Audio: {JSON.stringify(issue?.recording?.id) ?? '--'}
+          </Text>
+        )}
       </View>
       <View style={{ paddingHorizontal: 50 }}>
         <Button
@@ -237,11 +232,54 @@ function Content({ issue, eadl }) {
           style={{ alignSelf: 'center', margin: 24 }}
           labelStyle={{ color: 'white', fontFamily: 'Poppins_500Medium' }}
           mode="contained"
-          onPress={() => submitIssue()}
+          onPress={() => {
+            if (issue.category && issue.category.confidentiality_level === 'Confidential') {
+              _showDialog();
+              return;
+            }
+            submitIssue();
+          }}
         >
-          {i18n.t('submit_button_text')}
+          {t('submit_button_text')}
         </Button>
       </View>
+
+      <Portal>
+        <Dialog visible={showDialog} onDismiss={_hideDialog}>
+          <Dialog.Title>{t('warning')}</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>{t('confidential_complaint')}</Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              theme={theme}
+              style={{
+                alignSelf: 'center',
+                backgroundColor: '#E74C3C',
+                paddingLeft: 15,
+                paddingRight: 15,
+              }}
+              labelStyle={{ color: 'white', fontFamily: 'Poppins_500Medium' }}
+              mode="contained"
+              onPress={_hideDialog}
+            >
+              {t('no')}
+            </Button>
+            <Button
+              theme={theme}
+              style={{ alignSelf: 'center', margin: 24, paddingLeft: 15, paddingRight: 15 }}
+              labelStyle={{ color: 'white', fontFamily: 'Poppins_500Medium' }}
+              mode="contained"
+              onPress={() => {
+                _hideDialog();
+                submitIssue();
+              }}
+            >
+              {t('yes')}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </ScrollView>
   );
 }

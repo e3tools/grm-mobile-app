@@ -1,29 +1,37 @@
 import React, { useState } from 'react';
 
+import { Controller, useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import {
   Keyboard,
-  Text,
-  View,
-  TouchableWithoutFeedback,
   KeyboardAvoidingView,
-  TouchableOpacity,
   ScrollView,
+  Text,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
-import { ActivityIndicator, Button, Title, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Button, TextInput } from 'react-native-paper';
 import { useDispatch } from 'react-redux';
-import { Controller, useForm } from 'react-hook-form';
+import API from '../../../services/API';
 import { login } from '../../../store/ducks/authentication.duck';
-import MapBg from '../../../../assets/map-bg.svg';
-import EADLLogo from '../../../../assets/eadl-logo.svg';
-import styles from './Login.style';
+import { colors } from '../../../utils/colors';
 import MESSAGES from '../../../utils/formErrorMessages';
 import { emailRegex, passwordRegex } from '../../../utils/formUtils';
-import API from '../../../services/API';
 import { getEncryptedData } from '../../../utils/storageManager';
-import { titles } from '../../Onboarding/containers/Content/utils';
-import i18n from 'i18n-js';
+import styles from './Login.style';
+
+const theme = {
+  roundness: 12,
+  colors: {
+    ...colors,
+    background: 'white',
+    placeholder: '#dedede',
+    text: '#707070',
+  },
+};
 
 function Login() {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [isPasswordSecure, setIsPasswordSecure] = useState(true);
@@ -92,8 +100,8 @@ function Login() {
               color: '#707070',
             }}
           >
-          {i18n.t('welcome_login')}
-        </Text>
+            {t('welcome_login')}
+          </Text>
         </View>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.loginScreenContainer}>
@@ -104,15 +112,9 @@ function Login() {
                     control={control}
                     render={({ onChange, onBlur, value }) => (
                       <TextInput
-                        theme={{
-                          roundness: 10,
-                          colors: {
-                            primary: '#24c38b',
-                            placeholder: '#dedede',
-                          },
-                        }}
+                        theme={theme}
                         autoCapitalize="none"
-                        label={i18n.t('email')}
+                        label={t('email')}
                         mode="outlined"
                         labelColor="#dedede"
                         style={styles.loginFormTextInput}
@@ -140,16 +142,10 @@ function Login() {
                     control={control}
                     render={({ onChange, onBlur, value }) => (
                       <TextInput
-                        theme={{
-                          roundness: 10,
-                          colors: {
-                            primary: '#24c38b',
-                            placeholder: '#dedede',
-                          },
-                        }}
+                        theme={theme}
                         mode="outlined"
                         placeholderColor="#dedede"
-                        label={i18n.t('password')}
+                        label={t('password')}
                         style={styles.loginFormTextInput}
                         left={
                           <TextInput.Icon
@@ -196,20 +192,20 @@ function Login() {
               </View>
             </KeyboardAvoidingView>
             {loading ? (
-              <ActivityIndicator color="#24c38b" />
+              <ActivityIndicator size="large" color="#24c38b" />
             ) : (
               <Button
+                // theme={theme}
                 style={[
                   styles.loginButton,
                   {
                     backgroundColor: errors ? '#24c38b' : '#dedede',
-                    marginTop: '40%',
                   },
                 ]}
                 onPress={handleSubmit(onLoginPress)}
                 color="white"
               >
-                {i18n.t('login')}
+                {t('login')}
               </Button>
             )}
           </View>

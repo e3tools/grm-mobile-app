@@ -1,73 +1,58 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { SafeAreaView } from 'react-native';
-import { useSelector } from 'react-redux';
 import { ActivityIndicator } from 'react-native-paper';
-import Content from './containers';
-import { styles } from './IssueSearch.style';
-import LocalDatabase, { LocalGRMDatabase } from '../../../utils/databaseManager';
+import { useSelector } from 'react-redux';
+import { useAllDocs, useFind } from 'use-pouchdb';
 import { colors } from '../../../utils/colors';
+import { styles } from './IssueSearch.style';
+import Content from './containers';
 
 function IssueSearch() {
   const customStyles = styles();
-  const [issues, setIssues] = useState();
-  const [statuses, setStatuses] = useState();
-  const [eadl, setEadl] = useState(false);
   const { username } = useSelector((state) => state.get('authentication').toObject());
 
-  useEffect(() => {
-    LocalGRMDatabase.find({
-      selector: { type: 'issue_status' },
-    })
-      .then((result) => {
-        setStatuses(result.docs);
-      })
-      .catch((err) => {
-        alert(`Unable to retrieve statuses. ${JSON.stringify(err)}`);
-      });
-  }, []);
+  const { rows, loading, state, error } = useAllDocs({
+    include_docs: true,
+    db: 'LocalGRMDatabase',
+  });
 
-  useEffect(() => {
-    if (username) {
-      LocalDatabase.find({
-        selector: { 'representative.email': username },
-        // fields: ["_id", "commune", "phases"],
-      })
-        .then((result) => {
-          setEadl(result.docs[0]);
 
-          // handle result
-        })
-        .catch((err) => {
-          console.log('ERROR FETCHING EADL', err);
-        });
-    }
-  }, [username]);
+  if (state === 'error') {
+    console.log('Error', state);
+  }
 
-  useEffect(() => {
-    // FETCH ISSUE CATEGORY
-    if (eadl) {
-      LocalGRMDatabase.find({
-        selector: {
-          type: 'issue',
-          'reporter.name': eadl.representative.name,
-        },
-      })
-        .then((result) => {
-          setIssues(result?.docs);
-        })
-        .catch((err) => {
-          console.log(err);
-        });
-    }
-  }, [eadl]);
+  const { docs: eadl, loading: eadlLoading } = useFind({
+    selector: { 'representative.email': username },
+    db: 'LocalDatabase',
+  });
 
-  if (!issues)
+  const { docs: statuses, loading: statusesLoading } = useFind({
+    selector: {
+      type: 'issue_status',
+    },
+    db: 'LocalGRMDatabase',
+  });
+
+  const { docs: issues, loading: issuesLoading } = useFind({
+    selector: {
+      type: 'issue',
+      $or: [
+        { 'reporter.name': eadl?.[0]?.representative?.name },
+        { 'assignee.name': eadl?.[0]?.representative?.name },
+      ],
+    },
+    db: 'LocalGRMDatabase',
+  });
+
+  if (!issues || !eadl || !statuses || issuesLoading || statusesLoading || eadlLoading) {
     return <ActivityIndicator style={{ marginTop: 50 }} color={colors.primary} size="small" />;
+  }
   return (
     <SafeAreaView style={customStyles.container}>
-      <Content issues={issues} eadl={eadl} statuses={statuses} />
+      <Content issues={issues} eadl={eadl?.[0]} statuses={statuses} />
     </SafeAreaView>
   );
 }
+
 
 export default IssueSearch;
