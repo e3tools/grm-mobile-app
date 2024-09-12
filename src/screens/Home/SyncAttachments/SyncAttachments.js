@@ -1,64 +1,129 @@
-import React, { useState, useEffect } from 'react';
-import { View, Platform, Modal, Text } from 'react-native';
-import axios from 'axios';
+import * as FileSystem from 'expo-file-system';
+import { getInfoAsync, uploadAsync } from 'expo-file-system';
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Modal, Platform, Text, View } from 'react-native';
 import { ActivityIndicator, Snackbar } from 'react-native-paper';
 import { useSelector } from 'react-redux';
-import { getInfoAsync } from 'expo-file-system';
-import LocalDatabase, { LocalGRMDatabase } from '../../../utils/databaseManager';
-import { colors } from '../../../utils/colors';
-import ImagesList from './components/ImagesList';
-import { getEncryptedData } from '../../../utils/storageManager';
-import CustomGreenButton from '../../../components/CustomGreenButton/CustomGreenButton';
-import SyncImage from '../../../../assets/sync-image.svg';
+import { useView } from 'use-pouchdb';
 import CheckCircle from '../../../../assets/check-circle.svg';
+import SyncImage from '../../../../assets/sync-image.svg';
+import CustomGreenButton from '../../../components/CustomGreenButton/CustomGreenButton';
 import { baseURL } from '../../../services/API';
-
-const FILE_READ_ERROR = 'Cannot read all the files.';
+import { colors } from '../../../utils/colors';
+import { SyncToRemoteDatabase } from '../../../utils/databaseManager';
+import { getEncryptedData } from '../../../utils/storageManager';
+import ImagesList from './components/ImagesList';
 
 function SyncAttachments({ navigation }) {
-  const [loading, setLoading] = useState(true);
-  const [attachments, setAttachments] = useState([]);
+  const { t } = useTranslation();
+
+  const FILE_READ_ERROR = t('file_read_error');
+  const FILE_READ_ERROR_TRY_AGAIN = t('file_read_error_try_again');
+
+  const [loading, setLoading] = useState(false);
+  // const [attachments, setAttachments] = useState([]);
   const [successModal, setSuccessModal] = useState(false);
   const [fetchedContent, setFetchedContent] = useState(false);
   const [errorVisible, setErrorVisible] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState(FILE_READ_ERROR);
 
   const onDismissSnackBar = () => setErrorVisible(false);
 
   const { username, userPassword } = useSelector((state) => state.get('authentication').toObject());
+
+  const { rows: representative, loading: eadlLoading } = useView('eadl/by_representative_email', {
+    key: username,
+    include_docs: true,
+    db: 'LocalCommunesDatabase',
+  });
+
+  const eadl = useMemo(() => representative.map((d) => d.doc), [representative]);
+
+  const { rows: grmIssues, loading: issuesLoading } = useView(
+    'issues/by_type_and_user',
+    {
+      startkey: ['issue', eadl?.[0]?._id],
+      endkey: ['issue', eadl?.[0]?._id, {}],
+      include_docs: true,
+      db: 'LocalGRMDatabase',
+    },
+    [eadl?.[0]?._id]
+  );
+
+  const issues = useMemo(() => grmIssues.map((r) => r.doc), [grmIssues]);
+
+  const attachments = useMemo(() => {
+    if (!eadlLoading && !issuesLoading && issues.length > 0 && eadl?.[0]?.representative?.id) {
+      return issues.flatMap((issue) => {
+        const attachments = issue?.attachments || [];
+        const reasons = issue?.reasons || [];
+
+        return [
+          ...attachments
+            .filter((attachment) => attachment.user_id === eadl[0].representative.id)
+            .map((attachment) => ({ attachment, docId: issue._id })),
+          ...reasons
+            .filter((reason) => reason.user_id === eadl[0].representative.id)
+            .map((reason) => ({ attachment: reason, docId: issue._id })),
+        ];
+      });
+    }
+    return [];
+  }, [issues, eadl, eadlLoading, issuesLoading]);
+
+  console.log({ issues, eadl, eadlLoading, attachments, loading });
+
   const uploadFile = async (file, dbConfig) => {
     try {
       const tmp = await getInfoAsync(file?.attachment?.local_url);
       if (tmp.exists) {
-        const formData = new FormData();
-        formData.append('username', dbConfig?.username);
-        formData.append('password', dbConfig?.password);
-        formData.append('doc_id', file?.docId);
-        formData.append('phase', file?.phaseOrdinal);
-        formData.append('task', file?.taskOrdinal);
-        formData.append('attachment_id', file?.attachment?.id);
-        formData.append('file', {
-          uri:
+        try {
+          const response = await uploadAsync(
+            `${baseURL}${
+              file.taskOrdinal ? '/attachments/upload-to-task' : '/attachments/upload-to-issue'
+            }`,
             Platform.OS === 'android'
               ? file?.attachment?.local_url
               : file?.attachment?.local_url.replace('file://', ''),
-          name: file?.attachment?.name,
-          type: file.attachment?.isAudio ? 'audio/m4a' : 'image/jpeg', // it may be necessary in Android.
-        });
-
-        await axios.post(
-          `${baseURL}${
-            file.taskOrdinal ? '/attachments/upload-to-task' : '/attachments/upload-to-issue'
-          }`,
-          formData,
-          { 'Content-Type': 'multipart/form-data' }
-        );
-        return {};
+            {
+              fieldName: 'file',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              ContentType: 'multipart/form-data',
+              mimeType: file.attachment?.isAudio
+                ? 'audio/m4a'
+                : file?.attachment?.local_url.includes('.pdf')
+                ? 'application/pdf'
+                : 'image/*',
+              parameters: {
+                username: dbConfig?.username,
+                password: dbConfig?.password,
+                doc_id: file?.docId,
+                phase: file?.phaseOrdinal,
+                task: file?.taskOrdinal,
+                attachment_id: file?.attachment?.id,
+              },
+            }
+          );
+          // console.log(response);
+          if (response.status < 300) {
+            return {};
+          }
+        } catch (e) {
+          setErrorMessage(FILE_READ_ERROR);
+          setErrorVisible(true);
+          return { error: FILE_READ_ERROR };
+        }
       }
+      setErrorMessage(FILE_READ_ERROR);
       setErrorVisible(true);
       return { error: FILE_READ_ERROR };
     } catch (e) {
+      console.log(e);
+      setErrorMessage(FILE_READ_ERROR_TRY_AGAIN);
       setErrorVisible(true);
-      return { error: FILE_READ_ERROR };
+      return { error: FILE_READ_ERROR_TRY_AGAIN };
     }
   };
 
@@ -76,82 +141,9 @@ function SyncAttachments({ navigation }) {
     }
     setLoading(false);
     if (!isError) setSuccessModal(true);
+
+    await SyncToRemoteDatabase(dbConfig, username);
   };
-
-  useEffect(() => {
-    if (!fetchedContent) {
-      async function fetchContent() {
-        LocalDatabase.find({
-          selector: { 'representative.email': username },
-          // fields: ["_id", "phases"],
-        })
-          .then((result) => {
-            const phases = result?.docs[0]?.phases;
-            const docId = result?.docs[0]?._id;
-            const attachmentsArray = [];
-            for (let i = 0; i < phases.length; i++) {
-              const phaseOrdinal = phases[i]?.ordinal;
-              const tasks = phases[i]?.tasks;
-              for (let j = 0; j < tasks?.length; j++) {
-                const taskOrdinal = tasks[j]?.ordinal;
-                const attachments = tasks[j]?.attachments;
-                for (let k = 0; k < attachments?.length; k++) {
-                  const attachment = attachments[k];
-                  attachmentsArray.push({
-                    attachment,
-                    phaseOrdinal,
-                    taskOrdinal,
-                    docId,
-                  });
-                }
-              }
-            }
-
-            // fetch EADL
-            const issuesAttachments = [];
-            LocalDatabase.find({
-              selector: { 'representative.email': username },
-              // fields: ["_id", "commune", "phases"],
-            })
-              .then((eadl) => {
-                // FETCH GRM ISSUES
-                LocalGRMDatabase.find({
-                  selector: {
-                    type: 'issue',
-                    'reporter.name': eadl.docs[0].representative.name,
-                  },
-                }).then((res) => {
-                  for (let i = 0; i < res.docs.length; i++) {
-                    const attachments = res.docs[i]?.attachments;
-                    for (let k = 0; k < attachments?.length; k++) {
-                      issuesAttachments.push({
-                        attachment: attachments[k],
-                        docId: res?.docs[i]?._id,
-                      });
-                    }
-                    // console.log(res.docs[i].attachments)
-                  }
-                  setAttachments([...attachmentsArray.flat(2), ...issuesAttachments]);
-                  setLoading(false);
-                });
-
-                // handle result
-              })
-              .catch((err) => {
-                setLoading(false);
-              });
-
-            // handle result
-          })
-          .catch((err) => {
-            setLoading(false);
-          });
-        setLoading(false);
-      }
-      setLoading(true);
-      fetchContent();
-    }
-  }, []);
   return (
     <View style={{ flex: 1 }}>
       <Modal animationType="slide" style={{ flex: 1 }} visible={successModal}>
@@ -198,12 +190,12 @@ function SyncAttachments({ navigation }) {
               color: '#ffffff',
             }}
           >
-            DONE
+            {t('close')}
           </CustomGreenButton>
         </View>
       </Modal>
       <ImagesList attachments={attachments} />
-      {loading ? (
+      {loading || eadlLoading || issuesLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginVertical: 10 }} />
       ) : (
         <View>
@@ -225,12 +217,12 @@ function SyncAttachments({ navigation }) {
               color: '#ffffff',
             }}
           >
-            Sync
+            {t('synchronize')}
           </CustomGreenButton>
         </View>
       )}
       <Snackbar visible={errorVisible} duration={3000} onDismiss={onDismissSnackBar}>
-        {FILE_READ_ERROR}
+        {errorMessage}
       </Snackbar>
     </View>
   );

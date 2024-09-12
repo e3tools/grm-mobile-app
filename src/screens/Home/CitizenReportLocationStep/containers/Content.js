@@ -1,19 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { debounce } from 'lodash';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  View,
-  ScrollView,
-  Text,
-  Platform,
   KeyboardAvoidingView,
   TextInput as NativeTextInput,
+  Platform,
+  ScrollView,
+  Text,
+  View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { Button, TextInput } from 'react-native-paper';
-import { debounce } from 'lodash';
-import i18n from 'i18n-js';
-import { styles } from './Content.styles';
-import { colors } from '../../../../utils/colors';
 import CustomDropDownPicker from '../../../../components/CustomDropDownPicker/CustomDropDownPicker';
+import { colors } from '../../../../utils/colors';
+import { styles } from './Content.styles';
 
 const theme = {
   roundness: 12,
@@ -26,6 +26,7 @@ const theme = {
 };
 
 export function Content({ stepOneParams, stepTwoParams, issueCommunes, uniqueRegion }) {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const [communes, setCommunes] = useState(issueCommunes);
   const [commune1, setCommune1] = useState(null);
@@ -92,40 +93,42 @@ export function Content({ stepOneParams, stepTwoParams, issueCommunes, uniqueReg
     <ScrollView>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : null}>
         <View style={{ padding: 23 }}>
-          <Text style={styles.stepText}>{i18n.t('step_4')}</Text>
-          <Text style={styles.stepDescription}>{i18n.t('step_location_description')}</Text>
-          <Text style={styles.stepNote}>{i18n.t('step_location_body')}</Text>
+          <Text style={styles.stepText}>{t('step_4')}</Text>
+          <Text style={styles.stepDescription}>{t('step_location_description')}</Text>
+          <Text style={styles.stepNote}>{t('step_location_body')}</Text>
         </View>
 
         {!uniqueRegion && communes && (
-          <CustomDropDownPicker
-            schema={{
-              label: 'name',
-              value: 'administrative_id',
-            }}
-            placeholder={i18n.t('step_location_dropdown_placeholder')}
-            value={commune1}
-            disabled={!!uniqueRegion}
-            items={filterCommunes(null)}
-            setPickerValue={(val) => {
-              setCommune1(val());
-              if (val() && val() !== commune1) handlePickCommune(val());
-            }}
-            onSelectItem={(item) => setLocation(item)}
-            // onChangeValue={(value) => {
-            //   if (value) handlePickCommune(value);
-            // }}
-          />
+          <View key="firstLevel">
+            <CustomDropDownPicker
+              schema={{
+                label: 'name',
+                value: 'administrative_id',
+              }}
+              placeholder={t('step_location_dropdown_placeholder')}
+              value={commune1}
+              disabled={!!uniqueRegion}
+              items={filterCommunes(null)}
+              setPickerValue={(val) => {
+                setCommune1(val());
+                if (val() && val() !== commune1) handlePickCommune(val());
+              }}
+              onSelectItem={(item) => setLocation(item)}
+              // onChangeValue={(value) => {
+              //   if (value) handlePickCommune(value);
+              // }}
+            />
+          </View>
         )}
         {communesPickers.map((parent, index) => (
-          <View style={{ zIndex: 1000 + index }}>
+          <View style={{ zIndex: 1000 + index }} key={{ index }}>
             <CustomDropDownPicker
               schema={{
                 label: 'name',
                 value: 'administrative_id',
               }}
               disabled={!!uniqueRegion}
-              placeholder={i18n.t('step_location_dropdown_placeholder')}
+              placeholder={t('step_location_dropdown_placeholder')}
               value={pickersState[index]}
               items={filterCommunes(parent, index)}
               onSelectItem={(item) => setLocation(item)}
@@ -142,7 +145,7 @@ export function Content({ stepOneParams, stepTwoParams, issueCommunes, uniqueReg
           </View>
         ))}
         <View style={{ paddingHorizontal: 50 }}>
-          <Text style={styles.stepNote}>{i18n.t('step_location_input_explanation')}</Text>
+          <Text style={styles.stepNote}>{t('step_location_input_explanation')}</Text>
           <TextInput
             multiline
             numberOfLines={4}
@@ -152,10 +155,11 @@ export function Content({ stepOneParams, stepTwoParams, issueCommunes, uniqueReg
                 height: 100,
                 justifyContent: 'flex-start',
                 textAlignVertical: 'top',
+                fontSize: 14,
               },
             ]}
-            placeholder={i18n.t('step_2_placeholder_4')}
-            outlineColor="#f6f6f6"
+            placeholder={t('step_2_placeholder_3')}
+            outlineColor="#dedede"
             theme={theme}
             mode="outlined"
             value={additionalDetails}
@@ -200,7 +204,7 @@ export function Content({ stepOneParams, stepTwoParams, issueCommunes, uniqueReg
               });
             }}
           >
-            {i18n.t('next')}
+            {t('next')}
           </Button>
         </View>
       </KeyboardAvoidingView>

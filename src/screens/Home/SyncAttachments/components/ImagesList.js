@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator, Card } from 'react-native-paper';
 import { colors } from '../../../../utils/colors';
 
 function ImagesList({ attachments }) {
+  const { t } = useTranslation();
+
   const [_attachments, _setAttachments] = useState([]);
   const [loading, setLoading] = useState(true);
   function AttachmentComponent({ attachment }) {
@@ -13,52 +16,41 @@ function ImagesList({ attachments }) {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          marginVertical: 10,
+          marginVertical: 0,
+          // backgroundColor: '#fff',
+          marginBottom: 1,
           // justifyContent: 'space-around'
         }}
       >
-        {!attachment?.attachment?.isAudio && (
-          <Image
-            style={{
-              width: 57,
-              height: 57,
-              borderRadius: 10,
-              marginHorizontal: 21,
-            }}
-            source={{
-              uri: attachment?.attachment?.local_url,
-            }}
-          />
-        )}
-        <Card
-          style={{
-            borderRadius: 10,
-            backgroundColor: '#ffffff',
-            flex: 1,
-            padding: 10,
-            // marginRight: 21,
-            marginVertical: 5,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: 'Poppins_400Regular',
-              fontSize: 13,
-              fontWeight: 'normal',
-              fontStyle: 'normal',
-              lineHeight: 16,
-              letterSpacing: 0,
-              textAlign: 'left',
-              color: '#707070',
-            }}
-          >
-            {!attachment.taskOrdinal &&
-              `Fichier appartenant à un problème${
-                attachment?.attachment?.isAudio ? ' [Audio Recording]' : '.'
-              }`}
-            {attachment.taskOrdinal &&
-              `Attachment on task ${attachment?.taskOrdinal} of \n phase ${attachment?.phaseOrdinal}`}
-          </Text>
+        <Card style={styles.cardContainer}>
+          <View style={styles.imageView}>
+            {!attachment?.attachment?.isAudio ? (
+              <Image
+                style={styles.imageContainer}
+                source={{
+                  uri: attachment?.attachment?.local_url,
+                }}
+              />
+            ) : (
+              <Image
+                style={styles.imageContainer}
+                source={require('../../../../../assets/audio.png')}
+              />
+            )}
+          </View>
+          <View style={styles.textView}>
+            <Text style={styles.cardTitle}>
+              {t('reference')}: {attachment?.tracking_code}
+            </Text>
+            <Text style={styles.cardContent}>
+              {!attachment.taskOrdinal &&
+                `Fichier appartenant à un problème${
+                  attachment?.attachment?.isAudio ? ' [Audio Recording].' : ' [Image].'
+                }`}
+              {attachment.taskOrdinal &&
+                `Attachment on task ${attachment?.taskOrdinal} of \n phase ${attachment?.phaseOrdinal}`}
+            </Text>
+          </View>
         </Card>
       </View>
     );
@@ -84,7 +76,7 @@ function ImagesList({ attachments }) {
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
+      contentContainerStyle={{ justifyContent: 'center', alignItems: 'center', padding: 10 }}
     >
       {_attachments}
     </ScrollView>
@@ -92,3 +84,46 @@ function ImagesList({ attachments }) {
 }
 
 export default React.memo(ImagesList);
+
+const styles = StyleSheet.create({
+  imageContainer: {
+    width: 65,
+    height: 65,
+    borderRadius: 10,
+    // margin: 10,
+  },
+  cardContainer: {
+    backgroundColor: '#ffffff',
+    flex: 1,
+    flexDirection: 'row',
+    padding: 10,
+    marginVertical: 5,
+    borderColor: '#fff',
+  },
+  cardTitle: {
+    fontWeight: 'bold',
+  },
+  cardContent: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 13,
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    lineHeight: 16,
+    letterSpacing: 0,
+    textAlign: 'left',
+    color: '#707070',
+  },
+  imageView: {
+    flex: 1,
+    flexDirection: 'column',
+    left: 0,
+    width: '20%',
+  },
+  textView: {
+    flex: 1,
+    flexDirection: 'column',
+    position: 'absolute',
+    right: 0,
+    width: '80%',
+  },
+});

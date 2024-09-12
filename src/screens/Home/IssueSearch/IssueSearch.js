@@ -1,71 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { SafeAreaView } from 'react-native';
-import { useSelector } from 'react-redux';
 import { ActivityIndicator } from 'react-native-paper';
-import Content from './containers';
-import { styles } from './IssueSearch.style';
-import LocalDatabase, { LocalGRMDatabase } from '../../../utils/databaseManager';
+import { useSelector } from 'react-redux';
+import { useAllDocs, useView } from 'use-pouchdb';
 import { colors } from '../../../utils/colors';
+import { styles } from './IssueSearch.style';
+import Content from './containers';
 
 function IssueSearch() {
   const customStyles = styles();
-  const [issues, setIssues] = useState();
-  const [statuses, setStatuses] = useState();
-  const [eadl, setEadl] = useState(false);
   const { username } = useSelector((state) => state.get('authentication').toObject());
 
-  useEffect(() => {
-    LocalGRMDatabase.find({
-      selector: { type: 'issue_status' },
-    })
-      .then((result) => {
-        setStatuses(result.docs);
-      })
-      .catch((err) => {
-        alert(`Unable to retrieve statuses. ${JSON.stringify(err)}`);
-      });
-  }, []);
+  const { rows, loading, state, error } = useAllDocs({
+    include_docs: true,
+    db: 'LocalGRMDatabase',
+  });
 
-  useEffect(() => {
-    if (username) {
-      LocalDatabase.find({
-        selector: { 'representative.email': username },
-        // fields: ["_id", "commune", "phases"],
-      })
-        .then((result) => {
-          setEadl(result.docs[0]);
+  if (state === 'error') {
+    console.log('Error', state);
+  }
 
-          // handle result
-        })
-        .catch((err) => {
-          console.log('ERROR FETCHING EADL', err);
-        });
-    }
-  }, [username]);
+  const { rows: representative, loading: eadlLoading } = useView('eadl/by_representative_email', {
+    key: username,
+    include_docs: true,
+    db: 'LocalCommunesDatabase',
+  });
 
-  useEffect(() => {
-    // FETCH ISSUE CATEGORY
-    if (eadl) {
-      LocalGRMDatabase.find({
-        selector: {
-          type: 'issue',
-          'reporter.name': eadl.representative.name,
-        },
-      })
-        .then((result) => {
-          setIssues(result?.docs);
-        })
-        .catch((err) => {
-          console.log(err);
-        });
-    }
-  }, [eadl]);
+  const eadl = representative.map((d) => d.doc);
 
-  if (!issues)
+  const { rows: issue_status, loading: statusesLoading } = useView('issues/by_type', {
+    db: 'LocalGRMDatabase',
+    key: 'issue_status',
+    include_docs: true,
+  });
+  const statuses = issue_status.map((d) => d.doc);
+
+  const { rows: grmIssues, loading: issuesLoading } = useView('issues/by_type_and_user', {
+    startkey: ['issue', eadl?.[0]?._id],
+    endkey: ['issue', eadl?.[0]?._id, {}],
+    include_docs: true,
+    db: 'LocalGRMDatabase',
+  });
+  const issues = grmIssues.map((r) => r.doc);
+
+  if (!issues || !eadl || !statuses || issuesLoading || statusesLoading || eadlLoading) {
     return <ActivityIndicator style={{ marginTop: 50 }} color={colors.primary} size="small" />;
+  }
   return (
     <SafeAreaView style={customStyles.container}>
-      <Content issues={issues} eadl={eadl} statuses={statuses} />
+      <Content issues={issues} eadl={eadl?.[0]} statuses={statuses} />
     </SafeAreaView>
   );
 }
